@@ -59,6 +59,12 @@ jobs:
           -XX:MaxTenuringThreshold=1 -jar fabric-server-launcher.jar nogui &
           sleep 1800  # 运行30分钟
           
+      - name: Get Server IP
+        run: |
+          echo "Server IP Address:"
+          curl -s ifconfig.me
+          echo "Server Port: 25565"
+          
       - name: Backup World
         run: |
           tar -czf world-backup.tar.gz server/world
@@ -80,3 +86,9 @@ jobs:
             fi
             sleep 60
           done & 
+          
+      - name: Get Server IP
+        run: |
+          echo "Server IP Address:"
+          curl -s ifconfig.me
+          echo "Server Port: 25565" 
