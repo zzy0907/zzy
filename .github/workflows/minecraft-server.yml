@@ -61,9 +61,12 @@ jobs:
           
       - name: Get Server IP
         run: |
+          echo "===================="
+          echo "Minecraft Server Connection Info:"
           echo "Server IP Address:"
           curl -s ifconfig.me
           echo "Server Port: 25565"
+          echo "===================="
           
       - name: Backup World
         run: |
