@@ -1,1 +1,82 @@
+name: Minecraft Fabric Server
+on:
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: '0 */6 * * *'  # 每6小时运行一次
+  workflow_dispatch:  # 允许手动触发
 
+jobs:
+  run-minecraft-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          
+      - name: Cache Server Files
+        uses: actions/cache@v3
+        with:
+          path: |
+            server
+            server.properties
+            world
+          key: ${{ runner.os }}-minecraft-${{ hashFiles('server/**') }}
+          
+      - name: Download Fabric Server
+        run: |
+          mkdir -p server
+          cd server
+          if [ ! -f fabric-server-launcher.jar ]; then
+            wget https://meta.fabricmc.net/v2/versions/loader/1.20.1/0.14.21/0.11.2/server/jar -O fabric-server-launcher.jar
+          fi
+          
+      - name: Configure Server
+        run: |
+          cd server
+          if [ ! -f server.properties ]; then
+            echo "eula=true" > eula.txt
+            echo "online-mode=false" > server.properties
+            echo "max-players=20" >> server.properties
+            echo "difficulty=normal" >> server.properties
+            echo "spawn-protection=0" >> server.properties
+            echo "server-port=25565" >> server.properties
+          fi
+          
+      - name: Start Server
+        run: |
+          cd server
+          java -Xmx3G -Xms2G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 \
+          -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch \
+          -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M \
+          -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 \
+          -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 \
+          -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem \
+          -XX:MaxTenuringThreshold=1 -jar fabric-server-launcher.jar nogui &
+          sleep 1800  # 延长运行时间到30分钟
+          
+      - name: Backup World
+        run: |
+          tar -czf world-backup.tar.gz server/world
+          
+      - name: Upload World Backup
+        uses: actions/upload-artifact@v3
+        with:
+          name: world-backup
+          path: world-backup.tar.gz
+          retention-days: 1 
+          
+      - name: Keep Server Alive
+        run: |
+          while true; do
+            if ! pgrep -f "fabric-server-launcher.jar" > /dev/null; then
+              echo "Server stopped, restarting..."
+              cd server
+              java -Xmx3G -Xms2G -XX:+UseG1GC -jar fabric-server-launcher.jar nogui &
+            fi
+            sleep 60
+          done & 
